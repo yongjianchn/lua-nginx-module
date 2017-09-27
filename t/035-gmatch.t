@@ -9,7 +9,7 @@ use Test::Nginx::Socket::Lua;
 no_shuffle();
 repeat_each(5);
 
-plan tests => repeat_each() * (blocks() * 2 + 7);
+plan tests => repeat_each() * (blocks() * 2 + 6);
 
 our $HtmlDir = html_dir;
 
@@ -482,9 +482,7 @@ end
     GET /main
 --- response_body
 matched
-sr failed: 500
---- error_log
-attempt to use ngx.re.gmatch iterator in a request that did not create it
+matched
 
 
 

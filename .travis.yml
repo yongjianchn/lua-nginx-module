@@ -7,7 +7,6 @@ language: c
 
 compiler:
   - gcc
-  - clang
 
 addons:
   apt:
@@ -128,5 +127,5 @@ script:
   - dig +short @$TEST_NGINX_RESOLVER openresty.org || exit 0
   - dig +short @$TEST_NGINX_RESOLVER agentzh.org || exit 0
   - export TEST_NGINX_INIT_BY_LUA="package.path = (package.path or '') .. ';$PWD/../lua-resty-core/lib/?.lua;$PWD/../lua-resty-lrucache/lib/?.lua;' require 'resty.core'"
-  - prove -Itest-nginx/lib -v -r t
+  - prove -Itest-nginx/lib  -r t
   - cat t/servroot/conf/nginx.conf
