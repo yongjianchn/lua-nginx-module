@@ -6,6 +6,7 @@ use Test::Nginx::Socket::Lua;
 #workers(2);
 #log_level('warn');
 
+no_shuffle();
 repeat_each(5);
 
 plan tests => repeat_each() * (blocks() * 2 + 7);
