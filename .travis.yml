@@ -84,7 +84,7 @@ install:
   - git clone https://github.com/openresty/rds-json-nginx-module.git ../rds-json-nginx-module
   - git clone https://github.com/openresty/srcache-nginx-module.git ../srcache-nginx-module
   - git clone https://github.com/openresty/redis2-nginx-module.git ../redis2-nginx-module
-  - git clone https://github.com/openresty/lua-resty-core.git ../lua-resty-core
+  - git clone https://github.com/spacewander/lua-resty-core.git -b re_gmatch_ffi ../lua-resty-core
   - git clone https://github.com/openresty/lua-resty-lrucache.git ../lua-resty-lrucache
   - git clone https://github.com/openresty/lua-resty-mysql.git ../lua-resty-mysql
   - git clone -b v2.1-agentzh https://github.com/openresty/luajit2.git
@@ -128,4 +128,6 @@ script:
   - export TEST_NGINX_RESOLVER=8.8.4.4
   - dig +short @$TEST_NGINX_RESOLVER openresty.org || exit 0
   - dig +short @$TEST_NGINX_RESOLVER agentzh.org || exit 0
+  - export TEST_NGINX_INIT_BY_LUA="package.path = (package.path or '') .. ';$PWD/../lua-resty-core/lib/?.lua;$PWD/../lua-resty-lrucache/lib/?.lua;' require 'resty.core'"
   - prove -Itest-nginx/lib -r t
+  - cat t/servroot/conf/nginx.conf
