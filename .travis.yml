@@ -25,6 +25,7 @@ addons:
 cache:
   directories:
   - download-cache
+  - $HOME/.ccache
 
 env:
   global:
@@ -48,6 +49,7 @@ env:
     - LD_LIBRARY_PATH=$LUAJIT_LIB:$LD_LIBRARY_PATH
     - DRIZZLE_VER=2011.07.21
     - TEST_NGINX_SLEEP=0.006
+    - CC="ccache $CC"
   matrix:
     - NGINX_VERSION=1.13.6
 
@@ -91,6 +93,7 @@ install:
 
 before_script:
   - mysql -uroot -e 'create database ngx_test; grant all on ngx_test.* to "ngx_test"@"%" identified by "ngx_test"; flush privileges;'
+  - ccache --show-stats
 
 script:
   - sudo iptables -I OUTPUT 1 -p udp --dport 10086 -j REJECT
