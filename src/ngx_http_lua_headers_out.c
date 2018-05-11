@@ -165,6 +165,7 @@ ngx_http_set_header_helper(ngx_http_request_t *r, ngx_http_lua_header_val_t *hv,
         }
 
         if (h[i].hash != 0
+            && h[i].hash == hv->hash
             && h[i].key.len == hv->key.len
             && ngx_strncasecmp(hv->key.data, h[i].key.data, h[i].key.len) == 0)
         {
@@ -182,7 +183,6 @@ ngx_http_set_header_helper(ngx_http_request_t *r, ngx_http_lua_header_val_t *hv,
                    value->data);
 
                 h[i].value = *value;
-                h[i].hash = hv->hash;
             }
 
             if (output_header) {
