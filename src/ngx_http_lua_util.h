@@ -244,6 +244,11 @@ void ngx_http_lua_cleanup_free(ngx_http_request_t *r,
     ngx_http_cleanup_pt *cleanup);
 
 
+typedef ngx_int_t (*hash_cmp)(u_char *, u_char *, size_t n);
+void * ngx_http_lua_hash_find(ngx_hash_t *hash, ngx_uint_t key,
+    ngx_str_t *name, hash_cmp cmp);
+
+
 #define ngx_http_lua_check_if_abortable(L, ctx)                              \
     if ((ctx)->no_abort) {                                                   \
         return luaL_error(L, "attempt to abort with pending subrequests");   \

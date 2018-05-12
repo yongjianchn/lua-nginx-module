@@ -42,6 +42,9 @@ static ngx_int_t ngx_http_set_location_header(ngx_http_request_t *r,
     ngx_http_lua_header_val_t *hv, ngx_str_t *value);
 
 
+static ngx_hash_t ngx_http_lua_headers_out_hash;
+
+
 static ngx_http_lua_set_header_t  ngx_http_lua_set_handlers[] = {
 
     { ngx_string("Server"),
@@ -108,6 +111,50 @@ static ngx_http_lua_set_header_t  ngx_http_lua_set_handlers[] = {
 
     { ngx_null_string, 0, ngx_http_set_header }
 };
+
+
+ngx_int_t
+ngx_http_lua_headers_out_init(ngx_conf_t *cf)
+{
+    int                               i, size;
+    ngx_array_t                       headers;
+    ngx_hash_key_t                   *header;
+    ngx_hash_init_t                   hash;
+    ngx_http_lua_set_header_t        *handlers = ngx_http_lua_set_handlers;
+
+    hash.hash = &ngx_http_lua_headers_out_hash;
+    hash.key = ngx_hash_key_lc;
+    hash.max_size = 64;
+    hash.bucket_size = 64;
+    hash.name = "lua_headers_out";
+    hash.pool = cf->pool;
+    hash.temp_pool = NULL;
+
+    size = sizeof(ngx_http_lua_set_handlers) /
+        sizeof(ngx_http_lua_set_header_t) - 1;
+
+    if (ngx_array_init(&headers, cf->temp_pool, size, sizeof(ngx_hash_key_t))
+        != NGX_OK)
+    {
+        return NGX_ERROR;
+    }
+
+    for (i = 0; handlers[i].name.len; i++) {
+        header = ngx_array_push(&headers);
+        header->key.len = handlers[i].name.len;
+        header->key.data = handlers[i].name.data;
+        header->key_hash = hash.key(header->key.data, header->key.len);
+        header->value = &handlers[i];
+    }
+
+    if (ngx_hash_init(&hash, (ngx_hash_key_t *) headers.elts, headers.nelts)
+        != NGX_OK)
+    {
+        return NGX_ERROR;
+    }
+
+    return NGX_OK;
+}
 
 
 /* request time implementation */
@@ -480,8 +527,7 @@ ngx_http_lua_set_output_header(ngx_http_request_t *r, ngx_str_t key,
     ngx_str_t value, unsigned override)
 {
     ngx_http_lua_header_val_t         hv;
-    ngx_http_lua_set_header_t        *handlers = ngx_http_lua_set_handlers;
-    ngx_uint_t                        i;
+    ngx_http_lua_set_header_t        *handler;
 
     dd("set header value: %.*s", (int) value.len, value.data);
 
@@ -492,28 +538,15 @@ ngx_http_lua_set_output_header(ngx_http_request_t *r, ngx_str_t key,
     hv.no_override = !override;
     hv.handler = NULL;
 
-    for (i = 0; handlers[i].name.len; i++) {
-        if (hv.key.len != handlers[i].name.len
-            || ngx_strncasecmp(hv.key.data, handlers[i].name.data,
-                               handlers[i].name.len) != 0)
-        {
-            dd("hv key comparison: %s <> %s", handlers[i].name.data,
-               hv.key.data);
-
-            continue;
-        }
-
-        dd("Matched handler: %s %s", handlers[i].name.data, hv.key.data);
-
-        hv.offset = handlers[i].offset;
-        hv.handler = handlers[i].handler;
-
-        break;
-    }
-
-    if (handlers[i].name.len == 0 && handlers[i].handler) {
-        hv.offset = handlers[i].offset;
-        hv.handler = handlers[i].handler;
+    handler = ngx_http_lua_hash_find(&ngx_http_lua_headers_out_hash, hv.hash,
+                                     &hv.key, ngx_strncasecmp);
+    if (handler) {
+        dd("Matched handler: %s %s", handler->name.data, hv.key.data);
+        hv.offset = handler->offset;
+        hv.handler = handler->handler;
+    } else {
+        hv.offset = 0;
+        hv.handler = ngx_http_set_header;
     }
 
 #if 1

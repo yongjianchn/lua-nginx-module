@@ -1699,3 +1699,19 @@ found 3 resp headers
 --- no_error_log
 [error]
 lua exceeding response header limit
+
+
+
+=== TEST 76: ensure response header hash size is enough
+--- config
+    location /resp-header {
+        content_by_lua_block {
+            ngx.say('OK');
+        }
+    }
+--- request
+GET /resp-header
+--- response_body
+OK
+--- no_error_log eval
+qr/could not build optimal \w+, you should increase/

@@ -29,6 +29,7 @@
 #include "ngx_http_lua_ssl_session_storeby.h"
 #include "ngx_http_lua_ssl_session_fetchby.h"
 #include "ngx_http_lua_headers.h"
+#include "ngx_http_lua_headers_out.h"
 
 
 static void *ngx_http_lua_create_main_conf(ngx_conf_t *cf);
@@ -720,6 +721,10 @@ ngx_http_lua_init(ngx_conf_t *cf)
         if (rc != NGX_OK) {
             return rc;
         }
+    }
+
+    if (ngx_http_lua_headers_out_init(cf) != NGX_OK) {
+        return NGX_ERROR;
     }
 
 #ifndef NGX_LUA_NO_FFI_API

@@ -12,6 +12,7 @@
 #include "ngx_http_lua_common.h"
 
 
+ngx_int_t ngx_http_lua_headers_out_init(ngx_conf_t *cf);
 ngx_int_t ngx_http_lua_set_output_header(ngx_http_request_t *r, ngx_str_t key,
     ngx_str_t value, unsigned override);
 int ngx_http_lua_get_output_header(lua_State *L, ngx_http_request_t *r,

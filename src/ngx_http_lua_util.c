@@ -4129,4 +4129,38 @@ ngx_http_lua_cleanup_free(ngx_http_request_t *r, ngx_http_cleanup_pt *cleanup)
 }
 
 
+void *
+ngx_http_lua_hash_find(ngx_hash_t *hash, ngx_uint_t key, ngx_str_t *name,
+                       hash_cmp cmp)
+{
+    ngx_hash_elt_t  *elt;
+
+    elt = hash->buckets[key % hash->size];
+
+    if (elt == NULL) {
+        return NULL;
+    }
+
+    while (elt->value) {
+        if (name->len != (size_t) elt->len) {
+            goto next;
+        }
+
+        if (cmp(name->data, elt->name, name->len) != 0) {
+            goto next;
+        }
+
+        return elt->value;
+
+    next:
+
+        elt = (ngx_hash_elt_t *) ngx_align_ptr(&elt->name[0] + elt->len,
+                                               sizeof(void *));
+        continue;
+    }
+
+    return NULL;
+}
+
+
 /* vi:set ft=c ts=4 sw=4 et fdm=marker: */
