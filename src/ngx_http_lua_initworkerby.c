@@ -13,6 +13,10 @@
 #include "ngx_http_lua_initworkerby.h"
 #include "ngx_http_lua_util.h"
 
+#if !(NGX_WIN32)
+#include "ngx_http_lua_pipe.h"
+#endif
+
 
 static u_char *ngx_http_lua_log_init_worker_error(ngx_log_t *log,
     u_char *buf, size_t len);
@@ -64,6 +68,10 @@ ngx_http_lua_init_worker(ngx_cycle_t *cycle)
         lmcf->vm_cleanup->handler = NULL;
 
         return NGX_OK;
+    }
+
+    if (ngx_http_lua_pipe_add_signal_handler(cycle) != NGX_OK) {
+        return NGX_ERROR;
     }
 #endif  /* NGX_WIN32 */
 
