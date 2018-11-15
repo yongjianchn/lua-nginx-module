@@ -11,13 +11,6 @@
 #include "ngx_http_lua_common.h"
 
 
-#define NGX_HTTP_LUA_PIPE_ET_ERROR         0x0001
-#define NGX_HTTP_LUA_PIPE_ET_CLOSED        0x0002
-#define NGX_HTTP_LUA_PIPE_ET_SYSCALL       0x0003
-#define NGX_HTTP_LUA_PIPE_ET_NOMEM         0x0004
-#define NGX_HTTP_LUA_PIPE_ET_TIMEOUT       0x0005
-
-
 typedef ngx_int_t (*ngx_http_lua_pipe_input_filter)(void *data, ssize_t bytes);
 
 

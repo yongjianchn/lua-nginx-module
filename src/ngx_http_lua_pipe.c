@@ -119,6 +119,16 @@ ngx_http_lua_pipe_signal_t ngx_signals[] = {
 
 
 enum {
+    PIPE_ERR_CLOSED = 1,
+    PIPE_ERR_SYSCALL,
+    PIPE_ERR_NOMEM,
+    PIPE_ERR_TIMEOUT,
+    PIPE_ERR_ADD_READ_EV,
+    PIPE_ERR_ADD_WRITE_EV
+};
+
+
+enum {
     PIPE_READ_ALL     = 0,
     PIPE_READ_BYTES   = 1,
     PIPE_READ_LINE    = 2,
@@ -1145,27 +1155,35 @@ ngx_http_pipe_put_error(ngx_http_lua_pipe_ctx_t *pipe_ctx, u_char *errbuf,
 {
     switch (pipe_ctx->err_type) {
 
-    case NGX_HTTP_LUA_PIPE_ET_CLOSED:
+    case PIPE_ERR_CLOSED:
         *errbuf_size = ngx_snprintf(errbuf, *errbuf_size, "closed") - errbuf;
         break;
 
-    case NGX_HTTP_LUA_PIPE_ET_ERROR:
-        *errbuf_size = ngx_snprintf(errbuf, *errbuf_size, "error") - errbuf;
-        break;
-
-    case NGX_HTTP_LUA_PIPE_ET_SYSCALL:
+    case PIPE_ERR_SYSCALL:
         *errbuf_size = ngx_snprintf(errbuf, *errbuf_size, "%s",
                                     strerror(pipe_ctx->pipe_errno))
                        - errbuf;
         break;
 
-    case NGX_HTTP_LUA_PIPE_ET_NOMEM:
+    case PIPE_ERR_NOMEM:
         *errbuf_size =
             ngx_snprintf(errbuf, *errbuf_size, "no memory") - errbuf;
         break;
 
-    case NGX_HTTP_LUA_PIPE_ET_TIMEOUT:
+    case PIPE_ERR_TIMEOUT:
         *errbuf_size = ngx_snprintf(errbuf, *errbuf_size, "timeout") - errbuf;
+        break;
+
+    case PIPE_ERR_ADD_READ_EV:
+        *errbuf_size = ngx_snprintf(errbuf, *errbuf_size,
+                                    "failed to add read event")
+                       - errbuf;
+        break;
+
+    case PIPE_ERR_ADD_WRITE_EV:
+        *errbuf_size = ngx_snprintf(errbuf, *errbuf_size,
+                                    "failed to add write event")
+                       - errbuf;
         break;
 
     default:
@@ -1249,7 +1267,7 @@ ngx_http_lua_pipe_add_input_buffer(ngx_http_lua_pipe_t *pipe,
                                          pipe->buffer_size);
 
     if (cl == NULL) {
-        pipe_ctx->err_type = NGX_HTTP_LUA_PIPE_ET_NOMEM;
+        pipe_ctx->err_type = PIPE_ERR_NOMEM;
         return NGX_ERROR;
     }
 
@@ -1284,7 +1302,7 @@ ngx_http_lua_pipe_read_bytes(void *data, ssize_t bytes)
     rc = ngx_http_lua_read_bytes(&pipe_ctx->buffer, pipe_ctx->buf_in,
                                  &pipe_ctx->rest, bytes, ngx_cycle->log);
     if (rc == NGX_ERROR) {
-        pipe_ctx->err_type = NGX_HTTP_LUA_PIPE_ET_CLOSED;
+        pipe_ctx->err_type = PIPE_ERR_CLOSED;
         return NGX_ERROR;
     }
 
@@ -1302,7 +1320,7 @@ ngx_http_lua_pipe_read_line(void *data, ssize_t bytes)
     rc = ngx_http_lua_read_line(&pipe_ctx->buffer, pipe_ctx->buf_in, bytes,
                                 ngx_cycle->log);
     if (rc == NGX_ERROR) {
-        pipe_ctx->err_type = NGX_HTTP_LUA_PIPE_ET_CLOSED;
+        pipe_ctx->err_type = PIPE_ERR_CLOSED;
         return NGX_ERROR;
     }
 
@@ -1320,7 +1338,7 @@ ngx_http_lua_pipe_read_any(void *data, ssize_t bytes)
     rc = ngx_http_lua_read_any(&pipe_ctx->buffer, pipe_ctx->buf_in,
                                &pipe_ctx->rest, bytes, ngx_cycle->log);
     if (rc == NGX_ERROR) {
-        pipe_ctx->err_type = NGX_HTTP_LUA_PIPE_ET_CLOSED;
+        pipe_ctx->err_type = PIPE_ERR_CLOSED;
         return NGX_ERROR;
     }
 
@@ -1404,7 +1422,7 @@ ngx_http_lua_pipe_read(ngx_http_lua_pipe_t *pipe,
             ngx_log_debug1(NGX_LOG_DEBUG_HTTP, ngx_cycle->log, ngx_errno,
                            "lua pipe read data error pipe:%p", pipe_ctx);
 
-            pipe_ctx->err_type = NGX_HTTP_LUA_PIPE_ET_SYSCALL;
+            pipe_ctx->err_type = PIPE_ERR_SYSCALL;
             pipe_ctx->pipe_errno = ngx_errno;
             return NGX_ERROR;
         }
@@ -1573,7 +1591,7 @@ ngx_http_lua_ffi_pipe_proc_read(ngx_http_request_t *r,
                                             pipe->buffer_size);
 
         if (pipe_ctx->bufs_in == NULL) {
-            pipe_ctx->err_type = NGX_HTTP_LUA_PIPE_ET_NOMEM;
+            pipe_ctx->err_type = PIPE_ERR_NOMEM;
             goto error;
         }
 
@@ -1596,9 +1614,7 @@ ngx_http_lua_ffi_pipe_proc_read(ngx_http_request_t *r,
 
     c->data = wait_co_ctx;
     if (ngx_handle_read_event(rev, 0) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "lua pipe failed to add read event");
-        pipe_ctx->err_type = NGX_HTTP_LUA_PIPE_ET_ERROR;
+        pipe_ctx->err_type = PIPE_ERR_ADD_READ_EV;
         goto error;
     }
 
@@ -1737,10 +1753,10 @@ ngx_http_lua_pipe_write(ngx_http_lua_pipe_t *pipe,
                        "lua pipe write data error pipe:%p", pipe_ctx);
 
         if (ngx_errno == NGX_EPIPE) {
-            pipe_ctx->err_type = NGX_HTTP_LUA_PIPE_ET_CLOSED;
+            pipe_ctx->err_type = PIPE_ERR_CLOSED;
 
         } else {
-            pipe_ctx->err_type = NGX_HTTP_LUA_PIPE_ET_SYSCALL;
+            pipe_ctx->err_type = PIPE_ERR_SYSCALL;
             pipe_ctx->pipe_errno = ngx_errno;
         }
 
@@ -1811,7 +1827,7 @@ ngx_http_lua_ffi_pipe_proc_write(ngx_http_request_t *r,
     cl = ngx_http_lua_chain_get_free_buf(ngx_cycle->log, pipe->pool,
                                          &pipe->free_bufs, len);
     if (cl == NULL) {
-        pipe_ctx->err_type = NGX_HTTP_LUA_PIPE_ET_NOMEM;
+        pipe_ctx->err_type = PIPE_ERR_NOMEM;
         goto error;
     }
 
@@ -1834,9 +1850,7 @@ ngx_http_lua_ffi_pipe_proc_write(ngx_http_request_t *r,
 
     wev->handler = ngx_http_lua_pipe_resume_write_handler;
     if (ngx_handle_write_event(wev, 0) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                      "lua pipe failed to add write event");
-        pipe_ctx->err_type = NGX_HTTP_LUA_PIPE_ET_ERROR;
+        pipe_ctx->err_type = PIPE_ERR_ADD_WRITE_EV;
         goto error;
     }
 
@@ -2055,7 +2069,7 @@ ngx_http_lua_pipe_read_retval_helper(ngx_http_lua_ffi_pipe_proc_t *proc,
 
     if (pipe->timeout) {
         pipe->timeout = 0;
-        pipe_ctx->err_type = NGX_HTTP_LUA_PIPE_ET_TIMEOUT;
+        pipe_ctx->err_type = PIPE_ERR_TIMEOUT;
         return 0;
     }
 
@@ -2105,7 +2119,7 @@ ngx_http_lua_pipe_write_retval(ngx_http_lua_ffi_pipe_proc_t *proc, lua_State *L)
 
     if (pipe->timeout) {
         pipe->timeout = 0;
-        pipe_ctx->err_type = NGX_HTTP_LUA_PIPE_ET_TIMEOUT;
+        pipe_ctx->err_type = PIPE_ERR_TIMEOUT;
         return 0;
     }
 
