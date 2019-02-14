@@ -3982,6 +3982,19 @@ ngx_http_lua_socket_tcp_resume_conn_op(ngx_http_lua_socket_pool_t *spool)
     }
 #endif
 
+    ngx_queue_t                    *x, *uqueue;
+    uqueue = &spool->wait_connect_op;
+    int count = 0;
+
+    for (x = ngx_queue_head(uqueue);
+         x != ngx_queue_sentinel(uqueue);
+         x = ngx_queue_next(x)) {
+        count++;
+    }
+    //ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "spool conn count:%d", count);
+    ngx_http_lua_assert(!(spool->backlog >= 0
+                          && spool->connections > spool->size + count));
+
     /* we manually destroy wait_connect_op before triggering connect
      * operation resumption, so that there is no resumption happens when Nginx
      * is exiting.
@@ -4005,7 +4018,6 @@ ngx_http_lua_socket_tcp_resume_conn_op(ngx_http_lua_socket_pool_t *spool)
     }
 
     q = ngx_queue_head(&spool->wait_connect_op);
-    ngx_queue_remove(q);
     conn_op_ctx = ngx_queue_data(q, ngx_http_lua_socket_tcp_conn_op_ctx_t,
                                  queue);
     ngx_log_debug4(NGX_LOG_DEBUG_HTTP, ngx_cycle->log, 0,
@@ -4044,17 +4056,21 @@ ngx_http_lua_socket_tcp_conn_op_ctx_cleanup(void *data)
 static void
 ngx_http_lua_socket_tcp_conn_op_resume_handler(ngx_event_t *ev)
 {
-    ngx_http_lua_socket_tcp_upstream_t      *u;
-    ngx_http_lua_ctx_t                      *ctx;
+    ngx_queue_t                             *q;
     ngx_connection_t                        *c;
+    ngx_http_lua_ctx_t                      *ctx;
     ngx_http_request_t                      *r;
     ngx_http_cleanup_t                      *cln;
     ngx_http_lua_co_ctx_t                   *coctx;
+    ngx_http_lua_socket_tcp_upstream_t      *u;
     ngx_http_lua_socket_tcp_conn_op_ctx_t   *conn_op_ctx;
 
     conn_op_ctx = ev->data;
     u = conn_op_ctx->u;
     r = u->request;
+
+    q = ngx_queue_head(&u->socket_pool->wait_connect_op);
+    ngx_queue_remove(q);
 
     coctx = u->write_co_ctx;
     coctx->cleanup = NULL;
@@ -6052,16 +6068,15 @@ ngx_http_lua_tcp_queue_conn_op_cleanup(void *data)
     if (conn_op_ctx->event.posted) {
         ngx_delete_posted_event(&conn_op_ctx->event);
 
-    } else {
-        if (conn_op_ctx->event.timer_set) {
-            ngx_del_timer(&conn_op_ctx->event);
-        }
-
-        ngx_queue_remove(&conn_op_ctx->queue);
-        ngx_queue_insert_head(&u->socket_pool->cache_connect_op,
-                              &conn_op_ctx->queue);
+    } else if (conn_op_ctx->event.timer_set) {
+        ngx_del_timer(&conn_op_ctx->event);
     }
 
+    ngx_queue_remove(&conn_op_ctx->queue);
+    ngx_queue_insert_head(&u->socket_pool->cache_connect_op,
+                          &conn_op_ctx->queue);
+    //ngx_log_error(NGX_LOG_EMERG, ngx_cycle->log, 0,
+                  //"spool conn --:queue_conn_op cleanup");
     u->socket_pool->connections--;
     ngx_http_lua_socket_tcp_resume_conn_op(u->socket_pool);
 }
