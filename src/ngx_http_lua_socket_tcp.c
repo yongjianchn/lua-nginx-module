@@ -140,6 +140,7 @@ static ngx_int_t ngx_http_lua_socket_tcp_read_resume(ngx_http_request_t *r);
 static ngx_int_t ngx_http_lua_socket_tcp_write_resume(ngx_http_request_t *r);
 static ngx_int_t ngx_http_lua_socket_tcp_resume_helper(ngx_http_request_t *r,
     int socket_op);
+static void ngx_http_lua_tcp_queue_conn_op_cleanup(void *data);
 static void ngx_http_lua_tcp_resolve_cleanup(void *data);
 static void ngx_http_lua_coctx_cleanup(void *data);
 static void ngx_http_lua_socket_free_pool(ngx_log_t *log,
@@ -559,6 +560,7 @@ ngx_http_lua_socket_tcp_connect_helper(lua_State *L,
 
         /* rc == NGX_DECLINED */
 
+        //ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "spool conn ++:new connection");
         spool->connections++;
 
         /* check if backlog is enabled and
@@ -569,6 +571,7 @@ ngx_http_lua_socket_tcp_connect_helper(lua_State *L,
                spool->key, spool->connections);
 
             if (spool->connections > spool->size + spool->backlog) {
+                //ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "spool conn --:too many waiting");
                 spool->connections--;
                 lua_pushnil(L);
                 lua_pushliteral(L, "too many waiting connect operations");
@@ -630,6 +633,10 @@ ngx_http_lua_socket_tcp_connect_helper(lua_State *L,
                 u->write_co_ctx = ctx->cur_co_ctx;
 
                 conn_op_ctx->u = u;
+                ctx->cur_co_ctx->cleanup =
+                    ngx_http_lua_tcp_queue_conn_op_cleanup;
+                ctx->cur_co_ctx->data = conn_op_ctx;
+
                 ngx_memzero(&conn_op_ctx->event, sizeof(ngx_event_t));
                 conn_op_ctx->event.handler =
                     ngx_http_lua_socket_tcp_conn_op_timeout_handler;
@@ -820,6 +827,7 @@ ngx_http_lua_socket_tcp_connect_helper(lua_State *L,
 failed:
 
     if (spool != NULL) {
+        //ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "spool conn --:resume conn in helper");
         spool->connections--;
         ngx_http_lua_socket_tcp_resume_conn_op(spool);
     }
@@ -829,6 +837,7 @@ failed:
 no_memory_and_not_resuming:
 
     if (spool != NULL) {
+        //ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "spool conn --:no memory in helper");
         spool->connections--;
         ngx_http_lua_socket_tcp_resume_conn_op(spool);
     }
@@ -3911,6 +3920,7 @@ ngx_http_lua_socket_tcp_conn_op_timeout_handler(ngx_event_t *ev)
 
     ngx_queue_insert_head(&u->socket_pool->cache_connect_op,
                           &conn_op_ctx->queue);
+    //ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "spool conn --:timeout");
     u->socket_pool->connections--;
 
     ctx = ngx_http_get_module_ctx(r, ngx_http_lua_module);
@@ -4115,6 +4125,7 @@ ngx_http_lua_socket_tcp_conn_op_resume_retval_handler(ngx_http_request_t *r,
     }
 
     /* decrease pending connect operation counter */
+    //ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "spool conn --:resume conn retval");
     u->socket_pool->connections--;
 
     nret = ngx_http_lua_socket_tcp_connect_helper(L, u, r, ctx,
@@ -4185,6 +4196,7 @@ ngx_http_lua_socket_tcp_finalize(ngx_http_request_t *r,
             return;
         }
 
+        //ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "spool conn --:finalize");
         spool->connections--;
 
         if (spool->connections == 0) {
@@ -5309,7 +5321,7 @@ ngx_http_lua_socket_tcp_setkeepalive(lua_State *L)
          * however, we don't create connection pool in previous connect method.
          * so we increase connections here for backward compatibility.
          */
-        spool->connections++;
+        //ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "spool conn new_pool");
     }
 
     if (ngx_queue_empty(&spool->free)) {
@@ -5320,13 +5332,21 @@ ngx_http_lua_socket_tcp_setkeepalive(lua_State *L)
         item = ngx_queue_data(q, ngx_http_lua_socket_pool_item_t, queue);
 
         ngx_http_lua_socket_tcp_close_connection(item->connection);
+        if (u->socket_pool != NULL) {
+        //ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "spool conn --:keepalive no space");
         spool->connections--;
+        }
 
     } else {
         q = ngx_queue_head(&spool->free);
         ngx_queue_remove(q);
 
         item = ngx_queue_data(q, ngx_http_lua_socket_pool_item_t, queue);
+
+        if (u->socket_pool == NULL) {
+            //ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "spool conn ++:create pool");
+            spool->connections++;
+        }
     }
 
     item->connection = c;
@@ -5556,6 +5576,7 @@ close:
 
     ngx_queue_remove(&item->queue);
     ngx_queue_insert_head(&spool->free, &item->queue);
+    //ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "spool conn --:keepalive close");
     spool->connections--;
 
     dd("keepalive: connections: %u", (unsigned) spool->connections);
@@ -5979,6 +6000,7 @@ ngx_http_lua_socket_tcp_resume_helper(ngx_http_request_t *r, int socket_op)
         && !u->conn_closed
         && u->socket_pool != NULL)
     {
+        //ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "spool conn --:resume conn in resume helper");
         u->socket_pool->connections--;
         ngx_http_lua_socket_tcp_resume_conn_op(u->socket_pool);
     }
@@ -6015,6 +6037,37 @@ ngx_http_lua_socket_tcp_resume_helper(ngx_http_request_t *r, int socket_op)
 
 
 static void
+ngx_http_lua_tcp_queue_conn_op_cleanup(void *data)
+{
+    ngx_http_lua_co_ctx_t                  *coctx = data;
+    ngx_http_lua_socket_tcp_upstream_t     *u;
+    ngx_http_lua_socket_tcp_conn_op_ctx_t  *conn_op_ctx;
+
+    conn_op_ctx = coctx->data;
+    u = conn_op_ctx->u;
+    ngx_log_error(NGX_LOG_INFO, ngx_cycle->log, 0,
+                  "cleanup lua tcp socket conn_op_ctx: %p, u: %p",
+                  conn_op_ctx, u);
+
+    if (conn_op_ctx->event.posted) {
+        ngx_delete_posted_event(&conn_op_ctx->event);
+
+    } else {
+        if (conn_op_ctx->event.timer_set) {
+            ngx_del_timer(&conn_op_ctx->event);
+        }
+
+        ngx_queue_remove(&conn_op_ctx->queue);
+        ngx_queue_insert_head(&u->socket_pool->cache_connect_op,
+                              &conn_op_ctx->queue);
+    }
+
+    u->socket_pool->connections--;
+    ngx_http_lua_socket_tcp_resume_conn_op(u->socket_pool);
+}
+
+
+static void
 ngx_http_lua_tcp_resolve_cleanup(void *data)
 {
     ngx_resolver_ctx_t                      *rctx;
@@ -6030,6 +6083,7 @@ ngx_http_lua_tcp_resolve_cleanup(void *data)
     }
 
     if (u->socket_pool != NULL) {
+        //ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "spool conn --:resolve cleanup");
         u->socket_pool->connections--;
         ngx_http_lua_socket_tcp_resume_conn_op(u->socket_pool);
     }
