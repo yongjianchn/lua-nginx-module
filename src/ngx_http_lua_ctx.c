@@ -138,44 +138,35 @@ ngx_http_lua_ngx_set_ctx_helper(lua_State *L, ngx_http_request_t *r,
 
 #ifndef NGX_LUA_NO_FFI_API
 int
-ngx_http_lua_ffi_get_ctx_ref(ngx_http_request_t *r)
-{
-    ngx_http_lua_ctx_t  *ctx;
-
-    ctx = ngx_http_get_module_ctx(r, ngx_http_lua_module);
-    if (ctx == NULL) {
-        return NGX_HTTP_LUA_FFI_NO_REQ_CTX;
-    }
-
-    return ctx->ctx_ref;
-}
-
-
-int
-ngx_http_lua_ffi_get_ssl_ctx_ref(ngx_http_request_t *r, int *in_ssl_phase)
+ngx_http_lua_ffi_get_ctx_ref(ngx_http_request_t *r, int *in_ssl_phase,
+    int *ssl_ctx_ref)
 {
     ngx_http_lua_ctx_t              *ctx;
     ngx_http_lua_ssl_ctx_t          *ssl_ctx;
 
-    if (r->connection->ssl == NULL) {
-        return LUA_NOREF;
-    }
-
     ctx = ngx_http_get_module_ctx(r, ngx_http_lua_module);
     if (ctx == NULL) {
         return NGX_HTTP_LUA_FFI_NO_REQ_CTX;
     }
 
-    ssl_ctx = ngx_http_lua_ssl_get_ctx(r->connection->ssl->connection);
-    if (ssl_ctx == NULL) {
-        return NGX_HTTP_LUA_FFI_NO_REQ_CTX;
+    if (ctx->ctx_ref >= 0 || in_ssl_phase == NULL) {
+        return ctx->ctx_ref;
     }
 
     *in_ssl_phase = ctx->context & (NGX_HTTP_LUA_CONTEXT_SSL_CERT
                     | NGX_HTTP_LUA_CONTEXT_SSL_SESS_FETCH
                     | NGX_HTTP_LUA_CONTEXT_SSL_SESS_STORE);
+    *ssl_ctx_ref = LUA_NOREF;
 
-    return ssl_ctx->ctx_ref;
+    if (r->connection->ssl != NULL) {
+        ssl_ctx = ngx_http_lua_ssl_get_ctx(r->connection->ssl->connection);
+
+        if (ssl_ctx != NULL) {
+            *ssl_ctx_ref = ssl_ctx->ctx_ref;
+        }
+    }
+
+    return LUA_NOREF;
 }
 
 
