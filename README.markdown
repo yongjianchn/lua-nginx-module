@@ -2621,10 +2621,20 @@ But do not forget to comment this line out before publishing your site to the wo
 If you are using the [official pre-built packages](http://openresty.org/en/linux-packages.html) for [OpenResty](https://openresty.org/)
 1.11.2.1 or later, then everything should work out of the box.
 
-If you are using OpenSSL libraries not provided by [OpenResty](https://openresty.org),
+If you are using OpenSSL libraries (< 1.1.1) not provided by [OpenResty](https://openresty.org),
 then you need to apply the following patch for OpenSSL 1.0.2h or later:
 
 <https://github.com/openresty/openresty/blob/master/patches/openssl-1.0.2h-sess_set_get_cb_yield.patch>
+
+You need to apply the following patch for OpenSSL 1.1.0c:
+
+<https://github.com/openresty/openresty/blob/master/patches/openssl-1.1.0c-sess_set_get_cb_yield.patch>
+
+For OpenSSL 1.1.0d or later, you need to apply the following patch:
+
+<https://github.com/openresty/openresty/blob/master/patches/openssl-1.1.0d-sess_set_get_cb_yield.patch>
+
+You don't need to apply any patch for OpenSSL 1.1.1.
 
 If you are not using the NGINX core shipped with [OpenResty](https://openresty.org) 1.11.2.1 or later, then you need to
 apply the following patch to the standard NGINX core 1.11.2 or later:
