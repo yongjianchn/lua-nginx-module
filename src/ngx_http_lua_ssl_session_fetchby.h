@@ -31,12 +31,12 @@ ngx_ssl_session_t *ngx_http_lua_ssl_sess_fetch_handler(
 #endif
     u_char *id, int len, int *copy);
 
-#if HAVE_SSL_CLIENT_HELLO_CB_SUPPORT
+#ifdef HAVE_SSL_CLIENT_HELLO_CB_SUPPORT
 int ngx_http_lua_ssl_client_hello_handler(ngx_ssl_conn_t *ssl_conn,
     int *al, void *arg);
 #endif
 
-#endif
+#endif /* NGX_HTTP_SSL */
 
 #endif /* _NGX_HTTP_LUA_SSL_SESSION_FETCHBY_H_INCLUDED_ */
 

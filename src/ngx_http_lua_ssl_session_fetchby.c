@@ -340,12 +340,12 @@ ngx_http_lua_ssl_sess_fetch_helper(ngx_ssl_conn_t *ssl_conn,
 
     *cctx->cleanup = ngx_http_lua_ssl_sess_fetch_aborted;
 
-#if defined(SSL_ERROR_PENDING_SESSION) || HAVE_SSL_CLIENT_HELLO_CB_SUPPORT
+#if defined(SSL_ERROR_PENDING_SESSION)                                       \
+    || defined(HAVE_SSL_CLIENT_HELLO_CB_SUPPORT)
 
     return NGX_AGAIN;
 
 #else
-
     res = NGX_AGAIN;
 
     /* fall through to the "failed" label below */
@@ -365,7 +365,7 @@ failed:
 }
 
 
-#if HAVE_SSL_CLIENT_HELLO_CB_SUPPORT
+#ifdef HAVE_SSL_CLIENT_HELLO_CB_SUPPORT
 int
 ngx_http_lua_ssl_client_hello_handler(ngx_ssl_conn_t *ssl_conn,
     int *al, void *arg)
