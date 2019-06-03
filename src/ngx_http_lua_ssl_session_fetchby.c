@@ -433,6 +433,8 @@ ngx_http_lua_ssl_sess_fetch_handler(ngx_ssl_conn_t *ssl_conn,
 
     *copy = 0;
 
+    c = ngx_ssl_get_connection(ssl_conn);
+
     rc = ngx_http_lua_ssl_sess_fetch_helper(ssl_conn, id, len);
 
     if (rc == NGX_AGAIN) {
@@ -456,8 +458,6 @@ ngx_http_lua_ssl_sess_fetch_handler(ngx_ssl_conn_t *ssl_conn,
     }
 
     /* rc == NGX_OK */
-
-    c = ngx_ssl_get_connection(ssl_conn);
 
     cctx = ngx_http_lua_ssl_get_ctx(c->ssl->connection);
     return cctx->session;
