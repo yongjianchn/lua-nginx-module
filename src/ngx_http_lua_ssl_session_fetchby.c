@@ -439,7 +439,7 @@ ngx_http_lua_ssl_sess_fetch_handler(ngx_ssl_conn_t *ssl_conn,
 
     if (rc == NGX_AGAIN) {
 
-#ifdef SSL_ERROR_PENDING_SESSION
+#ifndef SSL_ERROR_PENDING_SESSION
 
         return SSL_magic_pending_session_ptr();
 
@@ -447,7 +447,21 @@ ngx_http_lua_ssl_sess_fetch_handler(ngx_ssl_conn_t *ssl_conn,
 
         ngx_log_error(NGX_LOG_CRIT, c->log, 0,
                       "lua: cannot yield in sess get cb: "
-                      "missing async sess get cb support in OpenSSL");
+#   if OPENSSL_VERSION_NUMBER >= 0x1010100fL
+                      "Missing asynchronous SSL features in the Nginx core. "
+                      "Please switch to OpenResty or apply the Nginx core "
+                      "patches yourself. See https://openresty.org/ and "
+                      "https://openresty.org/en/nginx-ssl-patches.html");
+
+#   else
+                      "Missing asynchronous SSL features in your "
+                      OPENSSL_VERSION_TEXT
+                      ". Please switch to OpenResty's OpenSSL packages or "
+                      "apply the OpenSSL patches yourself. "
+                      "See https://openresty.org/ and "
+                      "https://openresty.org/en/openssl-patches.html");
+#   endif
+
         return NULL;
 
 #endif
