@@ -2640,10 +2640,25 @@ For OpenSSL 1.1.0d and later:
 
 No patch is needed for OpenSSL 1.1.1 and later.
 
-If you are not using the NGINX core shipped with [OpenResty](https://openresty.org) 1.11.2.1 or later, then you need to
-apply the following patch to the standard NGINX core 1.11.2 or later:
+Similarly, if you are not using the NGINX core shipped with
+[OpenResty](https://openresty.org) 1.11.2.1 or later, then you need to apply
+the following patch to the standard NGINX core 1.11.2:
 
 <http://openresty.org/download/nginx-1.11.2-nonblocking_ssl_handshake_hooks.patch>
+
+For the 1.13.6 NGINX core, apply the following patches:
+
+<https://github.com/openresty/openresty/blob/master/patches/nginx-1.13.6-ssl_cert_cb_yield.patch>
+<https://github.com/openresty/openresty/blob/master/patches/nginx-1.13.6-ssl_pending_session.patch>
+
+For the 1.15.8 NGINX core:
+
+<https://github.com/openresty/openresty/blob/master/patches/nginx-1.15.8-ssl_cert_cb_yield.patch>
+<https://github.com/openresty/openresty/blob/master/patches/nginx-1.15.8-ssl_pending_session.patch>
+
+For subsequent NGINX cores, the patches will be updated and their name will
+contain the supported core version (e.g.
+`nginx-<major.minor.patch>-*.patch`).
 
 This directive was first introduced in the `v0.10.6` release.
 
