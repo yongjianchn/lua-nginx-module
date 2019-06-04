@@ -439,7 +439,7 @@ ngx_http_lua_ssl_sess_fetch_handler(ngx_ssl_conn_t *ssl_conn,
 
     if (rc == NGX_AGAIN) {
 
-#ifndef SSL_ERROR_PENDING_SESSION
+#ifdef SSL_ERROR_PENDING_SESSION
 
         return SSL_magic_pending_session_ptr();
 
